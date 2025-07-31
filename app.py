@@ -1,14 +1,39 @@
 import streamlit as st
 import numpy as np
-import tensorflow as tf
-from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
 import pandas as pd
 import pickle
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import warnings
 warnings.filterwarnings('ignore')
+
+# Try to import TensorFlow, handle gracefully if not available
+try:
+    import tensorflow as tf
+    TENSORFLOW_AVAILABLE = True
+except ImportError:
+    TENSORFLOW_AVAILABLE = False
+
+# Try to import scikit-learn components
+try:
+    from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+
+# Try to import visualization libraries
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+
+# Optional plotly imports
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
 
 # =============================================================================
 # PAGE CONFIGURATION
@@ -28,6 +53,13 @@ st.set_page_config(
 @st.cache_resource
 def load_model_components():
     """Load all model components with caching for better performance."""
+    if not TENSORFLOW_AVAILABLE:
+        return None, None, None, None, False
+        
+    if not SKLEARN_AVAILABLE:
+        st.error("❌ Scikit-learn is required but not available.")
+        return None, None, None, None, False
+        
     try:
         # Load the trained model
         model = tf.keras.models.load_model('model.h5')
@@ -45,24 +77,69 @@ def load_model_components():
         return model, label_encoder_gender, onehot_encoder_geo, scaler, True
         
     except FileNotFoundError as e:
-        st.error(f"❌ Model file not found: {e}")
-        st.info("Please run Experiments.ipynb first to generate the required model files.")
+        st.warning(f"⚠️ Model file not found: {e}")
+        st.info("This is a demo version without trained model files.")
         return None, None, None, None, False
     except Exception as e:
-        st.error(f"❌ Error loading model: {e}")
+        st.warning(f"⚠️ Error loading model: {e}")
+        st.info("Running in demo mode without full model functionality.")
         return None, None, None, None, False
+
+# Demo data for when model files are not available
+def create_demo_encoders():
+    """Create demo encoders for demonstration purposes."""
+    if not SKLEARN_AVAILABLE:
+        return None, None, None
+        
+    # Create dummy encoders with expected categories
+    demo_label_encoder = type('DemoLabelEncoder', (), {
+        'classes_': np.array(['Female', 'Male']),
+        'transform': lambda self, x: [0 if val == 'Female' else 1 for val in x]
+    })()
+    
+    demo_onehot_encoder = type('DemoOneHotEncoder', (), {
+        'categories_': [np.array(['France', 'Germany', 'Spain'])],
+        'get_feature_names_out': lambda self, cols=None: ['Geography_Germany', 'Geography_Spain'],
+        'transform': lambda self, x: np.array([[1, 0] if x[0][0] == 'Germany' else [0, 1] if x[0][0] == 'Spain' else [0, 0]])
+    })()
+    
+    demo_scaler = type('DemoScaler', (), {
+        'transform': lambda self, x: (x - np.mean(x, axis=0)) / (np.std(x, axis=0) + 1e-8)
+    })()
+    
+    return demo_label_encoder, demo_onehot_encoder, demo_scaler
 
 # Load components
 model, label_encoder_gender, onehot_encoder_geo, scaler, components_loaded = load_model_components()
 
+# If model components aren't loaded, use demo versions for UI demonstration
+if not components_loaded:
+    if SKLEARN_AVAILABLE:
+        label_encoder_gender, onehot_encoder_geo, scaler = create_demo_encoders()
+        demo_mode = True
+    else:
+        demo_mode = True
+        # Create minimal demo data
+        label_encoder_gender = type('DemoLabelEncoder', (), {'classes_': ['Female', 'Male']})()
+        onehot_encoder_geo = type('DemoOneHotEncoder', (), {'categories_': [['France', 'Germany', 'Spain']]})()
+else:
+    demo_mode = False
+
 
 ## streamlit app
-if not components_loaded:
-    st.stop()
 
 # =============================================================================
 # MAIN APPLICATION INTERFACE
 # =============================================================================
+
+# Display mode information
+if not TENSORFLOW_AVAILABLE:
+    st.error("🚫 **TensorFlow not available** - This deployment is running in demo mode")
+    st.info("💡 For full functionality with live predictions, run locally with: `pip install tensorflow` and the complete requirements.txt")
+
+if demo_mode:
+    st.warning("⚠️ **Demo Mode** - Model files not found. Interface demonstration only.")
+    st.info("🧠 To enable predictions: Run `Experiments.ipynb` to train and save the model, then restart the app.")
 
 # Custom CSS for better styling
 st.markdown("""
@@ -102,14 +179,23 @@ st.markdown("""
         text-align: center;
         margin: 0.5rem 0;
     }
+    .demo-banner {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Header
-st.markdown("""
+status_text = "Demo Version" if demo_mode else "Production Ready"
+st.markdown(f"""
 <div class="main-header">
     <h1>🏦 Customer Churn Prediction System</h1>
     <p>Advanced AI-powered customer retention analytics for banking institutions</p>
+    <small>Status: {status_text}</small>
 </div>
 """, unsafe_allow_html=True)
 
@@ -216,35 +302,65 @@ if page == "🔮 Prediction":
         )
     
     # Prediction button
-    if st.button("🔮 Predict Churn Probability", type="primary", use_container_width=True):
+    predict_button_text = "🎭 Demo Prediction (Simulated)" if demo_mode else "🔮 Predict Churn Probability"
+    
+    if st.button(predict_button_text, type="primary", use_container_width=True):
         
-        # Prepare the input data
-        input_data = pd.DataFrame({
-            'CreditScore': [credit_score],
-            'Gender': [label_encoder_gender.transform([gender])[0]],
-            'Age': [age],
-            'Tenure': [tenure],
-            'Balance': [balance],
-            'NumOfProducts': [num_of_products],
-            'HasCrCard': [has_cr_card],
-            'IsActiveMember': [is_active_member],
-            'EstimatedSalary': [estimated_salary]
-        })
-        
-        # One-hot encode 'Geography'
-        geo_encoded = onehot_encoder_geo.transform([[geography]]).toarray()
-        geo_encoded_df = pd.DataFrame(geo_encoded, columns=onehot_encoder_geo.get_feature_names_out(['Geography']))
-        
-        # Combine one-hot encoded columns with input data
-        input_data = pd.concat([input_data.reset_index(drop=True), geo_encoded_df], axis=1)
-        
-        # Scale the input data
-        input_data_scaled = scaler.transform(input_data)
-        
-        # Predict churn
-        with st.spinner("🧠 AI model analyzing customer data..."):
-            prediction = model.predict(input_data_scaled, verbose=0)
-            prediction_proba = prediction[0][0]
+        if demo_mode:
+            # Demo mode - simulate prediction
+            st.info("🎭 **Demo Mode**: Generating simulated prediction for demonstration purposes")
+            
+            # Create simulated prediction based on input characteristics
+            # Higher risk factors: older age, low balance, single product, inactive
+            risk_score = 0.5  # Base risk
+            
+            if age > 50:
+                risk_score += 0.2
+            if balance < 50000:
+                risk_score += 0.15
+            if num_of_products == 1:
+                risk_score += 0.1
+            if is_active_member == 0:
+                risk_score += 0.2
+            if credit_score < 600:
+                risk_score += 0.15
+            if geography == 'Germany':
+                risk_score += 0.1
+                
+            # Add some randomness but keep it realistic
+            import random
+            risk_score += random.uniform(-0.1, 0.1)
+            prediction_proba = max(0.05, min(0.95, risk_score))
+            
+        else:
+            # Real prediction mode
+            # Prepare the input data
+            input_data = pd.DataFrame({
+                'CreditScore': [credit_score],
+                'Gender': [label_encoder_gender.transform([gender])[0]],
+                'Age': [age],
+                'Tenure': [tenure],
+                'Balance': [balance],
+                'NumOfProducts': [num_of_products],
+                'HasCrCard': [has_cr_card],
+                'IsActiveMember': [is_active_member],
+                'EstimatedSalary': [estimated_salary]
+            })
+            
+            # One-hot encode 'Geography'
+            geo_encoded = onehot_encoder_geo.transform([[geography]]).toarray()
+            geo_encoded_df = pd.DataFrame(geo_encoded, columns=onehot_encoder_geo.get_feature_names_out(['Geography']))
+            
+            # Combine one-hot encoded columns with input data
+            input_data = pd.concat([input_data.reset_index(drop=True), geo_encoded_df], axis=1)
+            
+            # Scale the input data
+            input_data_scaled = scaler.transform(input_data)
+            
+            # Predict churn
+            with st.spinner("🧠 AI model analyzing customer data..."):
+                prediction = model.predict(input_data_scaled, verbose=0)
+                prediction_proba = prediction[0][0]
         
         # Display results with enhanced styling
         st.markdown("---")
