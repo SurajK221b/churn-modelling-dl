@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import pickle
+import os
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -61,10 +62,53 @@ def load_model_components():
         return None, None, None, None, False
         
     try:
-        # Load the trained model
-        model = tf.keras.models.load_model('model.h5')
+        # Try to load the model with multiple compatibility approaches
+        model = None
         
-        # Load the encoders and scaler (fixed filename)
+        # Approach 1: Try loading the newer Keras format first
+        if os.path.exists('model.keras'):
+            try:
+                model = tf.keras.models.load_model('model.keras')
+                st.success("✅ Model loaded successfully from model.keras")
+            except Exception as keras_error:
+                st.warning(f"⚠️ Keras format loading failed: {keras_error}")
+        
+        # Approach 2: Fall back to H5 format with compile=False
+        if model is None and os.path.exists('model.h5'):
+            try:
+                model = tf.keras.models.load_model('model.h5', compile=False)
+                
+                # Recompile the model with current TensorFlow version
+                model.compile(
+                    optimizer='adam',
+                    loss='binary_crossentropy',
+                    metrics=['accuracy']
+                )
+                st.success("✅ Model loaded successfully from model.h5 with recompilation")
+                
+            except Exception as h5_error:
+                st.warning(f"⚠️ H5 format loading failed: {h5_error}")
+        
+        # Approach 3: Try loading H5 with custom objects as last resort
+        if model is None and os.path.exists('model.h5'):
+            try:
+                model = tf.keras.models.load_model(
+                    'model.h5',
+                    custom_objects={
+                        'BinaryCrossentropy': tf.keras.losses.BinaryCrossentropy(),
+                        'Adam': tf.keras.optimizers.Adam()
+                    }
+                )
+                st.success("✅ Model loaded successfully with custom objects")
+                
+            except Exception as custom_error:
+                st.error(f"❌ All model loading approaches failed: {custom_error}")
+                raise custom_error
+        
+        if model is None:
+            raise FileNotFoundError("No valid model file found (model.keras or model.h5)")
+        
+        # Load the encoders and scaler
         with open('label_encoder_gender.pkl', 'rb') as file:
             label_encoder_gender = pickle.load(file)
         
@@ -81,7 +125,7 @@ def load_model_components():
         st.info("This is a demo version without trained model files.")
         return None, None, None, None, False
     except Exception as e:
-        st.warning(f"⚠️ Error loading model: {e}")
+        st.error(f"⚠️ Error loading model: {e}")
         st.info("Running in demo mode without full model functionality.")
         return None, None, None, None, False
 

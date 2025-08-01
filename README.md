@@ -414,19 +414,50 @@ git push heroku main
 
 ### Common Issues
 
-#### 1. Model Loading Errors
+#### 1. TensorFlow/Keras Version Compatibility
+```
+Error: BinaryCrossentropy.init() got an unexpected keyword argument 'fn'
+```
+**Solution**: 
+```bash
+# Option 1: Use the compatibility fix script
+python fix_model_compatibility.py
+
+# Option 2: Update requirements and retrain
+pip install tensorflow>=2.16.0,<2.18.0
+# Then run Experiments.ipynb to retrain the model
+
+# Option 3: Manual fix
+python -c "
+import tensorflow as tf
+model = tf.keras.models.load_model('model.h5', compile=False)
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+model.save('model.keras')
+"
+```
+
+#### 2. Model Loading Errors
 ```
 FileNotFoundError: model.h5 not found
 ```
 **Solution**: Run `Experiments.ipynb` first to train and save the model.
 
-#### 2. Prediction Errors
+#### 3. Streamlit Cloud Deployment Issues
+```
+No matching distribution found for tensorflow==X.X.X
+```
+**Solution**: The `requirements.txt` has been optimized for cloud deployment with version ranges:
+```
+tensorflow>=2.16.0,<2.18.0
+```
+
+#### 4. Prediction Errors
 ```
 ValueError: Feature shape mismatch
 ```
 **Solution**: Ensure input data has the same features as training data.
 
-#### 3. Performance Issues
+#### 5. Performance Issues
 ```
 Slow prediction times
 ```
@@ -444,6 +475,13 @@ try:
 except Exception as e:
     logging.error(f"Prediction failed: {e}")
 ```
+
+### Model Compatibility Guide
+| TensorFlow Version | Model Format | Compatibility |
+|-------------------|--------------|---------------|
+| 2.16.x - 2.17.x | model.keras | ✅ Recommended |
+| 2.15.x and older | model.h5 | ⚠️ May need recompilation |
+| 2.18.x+ | model.keras | ✅ Forward compatible |
 
 ## 📚 Additional Resources
 
