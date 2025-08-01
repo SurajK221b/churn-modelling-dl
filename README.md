@@ -553,7 +553,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🎯 Quick Links
 
 - [🚀 **Get Started**](#-quick-start) - Jump right into using the system
-- [📊 **View Demo**](https://churn-prediction-demo.streamlit.app) - Try the live demo
+- [📊 **View Demo**]([https://churn-prediction-demo.streamlit.app](https://churn-modelling-dl-evtbr8pyehgkg8pzccpnfc.streamlit.app/)) - Try the live demo
 - [📚 **Documentation**](#-usage-guide) - Comprehensive usage guide
 - [🤝 **Contribute**](#-contributing) - Help improve the project
 - [🐛 **Report Issues**](https://github.com/SurajK221b/churn-modelling-dl/issues) - Found a bug?
