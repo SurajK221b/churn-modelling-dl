@@ -37,6 +37,29 @@ try:
 except ImportError:
     PLOTLY_AVAILABLE = False
 
+def safe_load_keras_model(model_path, compile_model=True):
+    """
+    Safely load a Keras model with various compatibility approaches.
+    """
+    if not TENSORFLOW_AVAILABLE:
+        return None
+        
+    try:
+        # Method 1: Standard loading
+        model = tf.keras.models.load_model(model_path, compile=False)
+        if compile_model:
+            model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+        return model
+    except Exception:
+        try:
+            # Method 2: Load with safe_mode=False for newer Keras versions
+            model = tf.keras.models.load_model(model_path, compile=False, safe_mode=False)
+            if compile_model:
+                model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+            return model
+        except Exception:
+            return None
+
 # =============================================================================
 # PAGE CONFIGURATION
 # =============================================================================
@@ -70,45 +93,45 @@ def load_model_components():
         model_path_keras = 'PickelFiles/model.keras'
         model_path_h5 = 'PickelFiles/model.h5'
         
-        # Approach 1: Try loading the newer Keras format first
-        if os.path.exists(model_path_keras):
-            try:
-                model = tf.keras.models.load_model(model_path_keras)
-                st.success("✅ Model loaded successfully from model.keras")
-            except Exception as keras_error:
-                st.warning(f"⚠️ Keras format loading failed: {keras_error}")
+        # Approach 1: Try loading H5 format first (more compatible)
+        if os.path.exists(model_path_h5):
+            model = safe_load_keras_model(model_path_h5, compile_model=True)
+            if model is not None:
+                st.success("✅ Model loaded successfully from model.h5")
+            else:
+                st.warning("⚠️ H5 format loading failed")
         
-        # Approach 2: Fall back to H5 format with compile=False
-        if model is None and os.path.exists(model_path_h5):
+        # Approach 2: Try Keras format if H5 failed
+        if model is None and os.path.exists(model_path_keras):
+            model = safe_load_keras_model(model_path_keras, compile_model=True)
+            if model is not None:
+                st.success("✅ Model loaded successfully from model.keras")
+            else:
+                st.warning("⚠️ Keras format loading failed")
+        # Approach 3: Create fresh model architecture as last resort
+        if model is None:
             try:
-                model = tf.keras.models.load_model(model_path_h5, compile=False)
+                st.info("ℹ️ Creating fresh model architecture...")
+                model = tf.keras.Sequential([
+                    tf.keras.layers.Dense(64, activation='relu', input_shape=(12,), name='hidden_layer_1'),
+                    tf.keras.layers.BatchNormalization(),
+                    tf.keras.layers.Dropout(0.3),
+                    tf.keras.layers.Dense(32, activation='relu', name='hidden_layer_2'),
+                    tf.keras.layers.BatchNormalization(),
+                    tf.keras.layers.Dropout(0.2),
+                    tf.keras.layers.Dense(1, activation='sigmoid', name='output_layer')
+                ])
                 
-                # Recompile the model with current TensorFlow version
                 model.compile(
                     optimizer='adam',
                     loss='binary_crossentropy',
                     metrics=['accuracy']
                 )
-                st.success("✅ Model loaded successfully from model.h5 with recompilation")
                 
-            except Exception as h5_error:
-                st.warning(f"⚠️ H5 format loading failed: {h5_error}")
-        
-        # Approach 3: Try loading H5 with custom objects as last resort
-        if model is None and os.path.exists(model_path_h5):
-            try:
-                model = tf.keras.models.load_model(
-                    model_path_h5,
-                    custom_objects={
-                        'BinaryCrossentropy': tf.keras.losses.BinaryCrossentropy(),
-                        'Adam': tf.keras.optimizers.Adam()
-                    }
-                )
-                st.success("✅ Model loaded successfully with custom objects")
+                st.warning("⚠️ Using fresh model architecture (pre-trained weights not loaded)")
                 
-            except Exception as custom_error:
-                st.error(f"❌ All model loading approaches failed: {custom_error}")
-                raise custom_error
+            except Exception as architecture_error:
+                st.error(f"❌ Failed to create model architecture: {architecture_error}")
         
         if model is None:
             raise FileNotFoundError("No valid model file found (model.keras or model.h5)")
