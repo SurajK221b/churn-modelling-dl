@@ -23,6 +23,7 @@ except ImportError:
 # Try to import visualization libraries
 try:
     import matplotlib.pyplot as plt
+    import seaborn as sns
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
@@ -65,18 +66,22 @@ def load_model_components():
         # Try to load the model with multiple compatibility approaches
         model = None
         
+        # Check if files exist in PickelFiles directory
+        model_path_keras = 'PickelFiles/model.keras'
+        model_path_h5 = 'PickelFiles/model.h5'
+        
         # Approach 1: Try loading the newer Keras format first
-        if os.path.exists('model.keras'):
+        if os.path.exists(model_path_keras):
             try:
-                model = tf.keras.models.load_model('model.keras')
+                model = tf.keras.models.load_model(model_path_keras)
                 st.success("✅ Model loaded successfully from model.keras")
             except Exception as keras_error:
                 st.warning(f"⚠️ Keras format loading failed: {keras_error}")
         
         # Approach 2: Fall back to H5 format with compile=False
-        if model is None and os.path.exists('model.h5'):
+        if model is None and os.path.exists(model_path_h5):
             try:
-                model = tf.keras.models.load_model('model.h5', compile=False)
+                model = tf.keras.models.load_model(model_path_h5, compile=False)
                 
                 # Recompile the model with current TensorFlow version
                 model.compile(
@@ -90,10 +95,10 @@ def load_model_components():
                 st.warning(f"⚠️ H5 format loading failed: {h5_error}")
         
         # Approach 3: Try loading H5 with custom objects as last resort
-        if model is None and os.path.exists('model.h5'):
+        if model is None and os.path.exists(model_path_h5):
             try:
                 model = tf.keras.models.load_model(
-                    'model.h5',
+                    model_path_h5,
                     custom_objects={
                         'BinaryCrossentropy': tf.keras.losses.BinaryCrossentropy(),
                         'Adam': tf.keras.optimizers.Adam()
@@ -108,14 +113,14 @@ def load_model_components():
         if model is None:
             raise FileNotFoundError("No valid model file found (model.keras or model.h5)")
         
-        # Load the encoders and scaler
-        with open('label_encoder_gender.pkl', 'rb') as file:
+        # Load the encoders and scaler from PickelFiles directory
+        with open('PickelFiles/label_encoder_gender.pkl', 'rb') as file:
             label_encoder_gender = pickle.load(file)
         
-        with open('one_hot_encoder_geography.pkl', 'rb') as file:
+        with open('PickelFiles/onehot_encoder_geo.pkl', 'rb') as file:
             onehot_encoder_geo = pickle.load(file)
         
-        with open('scaler.pkl', 'rb') as file:
+        with open('PickelFiles/scaler.pkl', 'rb') as file:
             scaler = pickle.load(file)
             
         return model, label_encoder_gender, onehot_encoder_geo, scaler, True
@@ -169,9 +174,6 @@ if not components_loaded:
 else:
     demo_mode = False
 
-
-## streamlit app
-
 # =============================================================================
 # MAIN APPLICATION INTERFACE
 # =============================================================================
@@ -183,7 +185,7 @@ if not TENSORFLOW_AVAILABLE:
 
 if demo_mode:
     st.warning("⚠️ **Demo Mode** - Model files not found. Interface demonstration only.")
-    st.info("🧠 To enable predictions: Run `Experiments.ipynb` to train and save the model, then restart the app.")
+    st.info("🧠 To enable predictions: Run `Notebook/experiments.ipynb` to train and save the model, then restart the app.")
 
 # Custom CSS for better styling
 st.markdown("""
@@ -230,6 +232,12 @@ st.markdown("""
         padding: 1rem;
         margin: 1rem 0;
     }
+    .stSelectbox > div > div > select {
+        background-color: #f0f2f6;
+    }
+    .stSlider > div > div > div > div {
+        background-color: #1f77b4;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -247,7 +255,7 @@ st.markdown(f"""
 st.sidebar.title("📊 Navigation")
 page = st.sidebar.selectbox(
     "Select Page",
-    ["🔮 Prediction", "📈 Analytics", "ℹ️ About"]
+    ["🔮 Prediction", "📈 Analytics", "📊 Data Insights", "ℹ️ About"]
 )
 
 if page == "🔮 Prediction":
@@ -351,29 +359,17 @@ if page == "🔮 Prediction":
     if st.button(predict_button_text, type="primary", use_container_width=True):
         
         if demo_mode:
-            # Demo mode - simulate prediction
-            st.info("🎭 **Demo Mode**: Generating simulated prediction for demonstration purposes")
+            # Demo prediction using simple heuristics
+            risk_score = 0.5
             
-            # Create simulated prediction based on input characteristics
-            # Higher risk factors: older age, low balance, single product, inactive
-            risk_score = 0.5  # Base risk
+            # Simple risk calculation for demo
+            if age > 60: risk_score += 0.2
+            if credit_score < 600: risk_score += 0.2
+            if balance < 50000: risk_score += 0.1
+            if num_of_products == 1: risk_score += 0.15
+            if is_active_member == 0: risk_score += 0.25
+            if has_cr_card == 0: risk_score += 0.1
             
-            if age > 50:
-                risk_score += 0.2
-            if balance < 50000:
-                risk_score += 0.15
-            if num_of_products == 1:
-                risk_score += 0.1
-            if is_active_member == 0:
-                risk_score += 0.2
-            if credit_score < 600:
-                risk_score += 0.15
-            if geography == 'Germany':
-                risk_score += 0.1
-                
-            # Add some randomness but keep it realistic
-            import random
-            risk_score += random.uniform(-0.1, 0.1)
             prediction_proba = max(0.05, min(0.95, risk_score))
             
         else:
@@ -403,7 +399,7 @@ if page == "🔮 Prediction":
             
             # Predict churn
             with st.spinner("🧠 AI model analyzing customer data..."):
-                prediction = model.predict(input_data_scaled, verbose=0)
+                prediction = model.predict(input_data_scaled)
                 prediction_proba = prediction[0][0]
         
         # Display results with enhanced styling
@@ -517,20 +513,36 @@ elif page == "📈 Analytics":
     col1, col2 = st.columns(2)
     
     with col1:
-        st.info(f"""
-        **Model Architecture**: Deep Neural Network  
-        **Input Features**: {model.input_shape[1]}  
-        **Model Type**: Binary Classification  
-        **Framework**: TensorFlow/Keras
-        """)
+        if components_loaded:
+            st.info(f"""
+            **Model Architecture**: Deep Neural Network  
+            **Input Features**: {model.input_shape[1] if model else 'N/A'}  
+            **Model Type**: Binary Classification  
+            **Framework**: TensorFlow/Keras
+            """)
+        else:
+            st.info("""
+            **Model Architecture**: Deep Neural Network  
+            **Input Features**: 11 (when loaded)  
+            **Model Type**: Binary Classification  
+            **Framework**: TensorFlow/Keras
+            """)
     
     with col2:
-        st.info(f"""
-        **Total Parameters**: {model.count_params():,}  
-        **Layers**: {len(model.layers)}  
-        **Activation**: ReLU, Sigmoid  
-        **Optimizer**: Adam
-        """)
+        if components_loaded:
+            st.info(f"""
+            **Total Parameters**: {model.count_params():,}  
+            **Layers**: {len(model.layers)}  
+            **Activation**: ReLU, Sigmoid  
+            **Optimizer**: Adam
+            """)
+        else:
+            st.info("""
+            **Total Parameters**: ~5,000 (estimated)  
+            **Layers**: 4 (Input + 2 Hidden + Output)  
+            **Activation**: ReLU, Sigmoid  
+            **Optimizer**: Adam
+            """)
     
     # Feature importance (simplified visualization)
     st.subheader("📊 Feature Importance")
@@ -541,15 +553,21 @@ elif page == "📈 Analytics":
     importance = [0.25, 0.20, 0.15, 0.12, 0.10, 0.08, 0.05, 0.03, 0.02, 0.01]
     
     # Create a simple bar chart using Streamlit
-    import matplotlib.pyplot as plt
-    
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.barh(features, importance, color='skyblue')
-    ax.set_xlabel('Relative Importance')
-    ax.set_title('Feature Importance in Churn Prediction')
-    ax.grid(axis='x', alpha=0.3)
-    
-    st.pyplot(fig)
+    if MATPLOTLIB_AVAILABLE:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.barh(features, importance, color='skyblue')
+        ax.set_xlabel('Relative Importance')
+        ax.set_title('Feature Importance in Churn Prediction')
+        ax.grid(axis='x', alpha=0.3)
+        
+        st.pyplot(fig)
+    else:
+        # Fallback to simple chart
+        chart_data = pd.DataFrame({
+            'Features': features,
+            'Importance': importance
+        })
+        st.bar_chart(chart_data.set_index('Features'))
     
     # Model performance metrics
     st.subheader("📊 Model Performance Metrics")
@@ -568,6 +586,58 @@ elif page == "📈 Analytics":
     
     with col4:
         st.metric("F1-Score", "81.0%", "0.9%")
+
+elif page == "📊 Data Insights":
+    # =============================================================================
+    # DATA INSIGHTS PAGE
+    # =============================================================================
+    
+    st.header("📊 Data Insights & Statistics")
+    
+    # Load and display dataset information
+    try:
+        data = pd.read_csv('Data/Churn_Modelling.csv')
+        
+        st.subheader("📋 Dataset Overview")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total Customers", f"{len(data):,}")
+        
+        with col2:
+            churn_rate = data['Exited'].mean()
+            st.metric("Churn Rate", f"{churn_rate:.1%}")
+        
+        with col3:
+            avg_age = data['Age'].mean()
+            st.metric("Average Age", f"{avg_age:.1f}")
+        
+        with col4:
+            avg_balance = data['Balance'].mean()
+            st.metric("Average Balance", f"${avg_balance:,.0f}")
+        
+        # Display sample data
+        st.subheader("📄 Sample Data")
+        st.dataframe(data.head(10))
+        
+        # Basic statistics
+        st.subheader("📈 Statistical Summary")
+        st.dataframe(data.describe())
+        
+        # Churn distribution by geography
+        if PLOTLY_AVAILABLE:
+            st.subheader("🌍 Churn by Geography")
+            geo_churn = data.groupby('Geography')['Exited'].agg(['count', 'sum', 'mean']).reset_index()
+            geo_churn.columns = ['Geography', 'Total_Customers', 'Churned_Customers', 'Churn_Rate']
+            
+            fig = px.bar(geo_churn, x='Geography', y='Churn_Rate', 
+                        title='Churn Rate by Geography',
+                        labels={'Churn_Rate': 'Churn Rate (%)'})
+            st.plotly_chart(fig)
+        
+    except FileNotFoundError:
+        st.warning("⚠️ Dataset not found. Please ensure 'Data/Churn_Modelling.csv' exists.")
+        st.info("This page shows insights from the training dataset when available.")
 
 elif page == "ℹ️ About":
     # =============================================================================
@@ -627,15 +697,15 @@ elif page == "ℹ️ About":
     
     ## 📋 Requirements
     - Python 3.8+
-    - TensorFlow 2.15+
+    - TensorFlow 2.16+
     - Streamlit
     - Scikit-learn
     - Pandas, NumPy
     
     ## 🔗 Related Files
-    - `Experiments.ipynb`: Model training and experimentation
-    - `Prediction.ipynb`: Individual prediction examples and analysis
-    - `model.h5`: Trained neural network model
+    - `Notebook/experiments.ipynb`: Model training and experimentation
+    - `Notebook/prediction.ipynb`: Individual prediction examples and analysis
+    - `PickelFiles/model.h5`: Trained neural network model
     - Various `.pkl` files: Saved preprocessors (encoders, scaler)
     
     ---

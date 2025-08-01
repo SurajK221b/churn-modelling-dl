@@ -78,23 +78,20 @@ graph TB
 churn-modelling-dl/
 ├── 📊 Data/
 │   └── Churn_Modelling.csv          # Customer dataset
-├── 📓 Notebooks/
-│   ├── Experiments.ipynb            # Model training & experimentation  
-│   └── Prediction.ipynb             # Individual predictions & analysis
-├── 🤖 Models/
-│   ├── model.h5                     # Trained neural network
+├── 📓 Notebook/
+│   ├── experiments.ipynb            # Model training & experimentation  
+│   └── prediction.ipynb             # Individual predictions & analysis
+├── 🤖 PickelFiles/
+│   ├── model.h5                     # Trained neural network (legacy)
+│   ├── model.keras                  # Trained neural network (new format)
 │   ├── label_encoder_gender.pkl     # Gender encoder
 │   ├── one_hot_encoder_geography.pkl # Geography encoder
 │   └── scaler.pkl                   # Feature scaler
-├── 🌐 Application/
-│   └── app.py                       # Streamlit web application
-├── 📊 Logs/
+├── 🌐 app.py                        # Streamlit web application
+├── 📊 logs/
 │   └── fit/                         # TensorBoard training logs
-├── 📋 Configuration/
-│   ├── requirements.txt             # Python dependencies
-│   └── README.md                    # Project documentation
-└── 📈 Results/
-    └── prediction_summary.csv       # Batch prediction results
+├── 📋 requirements.txt              # Python dependencies
+└── 📖 README.md                     # Project documentation
 ```
 
 ## ⚡ Quick Start
@@ -112,12 +109,12 @@ pip install -r requirements.txt
 
 ### 3. Train the Model
 ```bash
-jupyter notebook Experiments.ipynb
+jupyter notebook Notebook/experiments.ipynb
 ```
 Run all cells to:
 - Preprocess the data
 - Train the neural network
-- Save model and preprocessors
+- Save model and preprocessors to PickelFiles/
 
 ### 4. Launch the Web Application
 ```bash
