@@ -1,27 +1,11 @@
-# Core ML and Data Science Libraries
-tensorflow>=2.16.0,<2.18.0
-pandas>=1.5.0,<3.0.0
-numpy>=1.24.0,<2.0.0
-scikit-learn>=1.3.0,<2.0.0
-
-# Visualization Libraries
-matplotlib>=3.7.0,<4.0.0
-seaborn>=0.12.0,<1.0.0
-
-# Web Application Framework
-streamlit>=1.28.0,<2.0.0
-
-# Deep Learning Utilities
-tensorboard>=2.16.0,<2.18.0
-
-# Model Interpretability
-scikeras>=0.12.0,<1.0.0
-
-# Development and Optimization
-plotly>=5.0.0,<6.0.0
-
-# Utility Libraries
-pickle-mixin>=1.0.0,<2.0.0
-
-# Production Requirements
-protobuf>=3.20.0,<5.0.0
+tensorflow>=2.20.0rc0 --pre
+tensorboard>=2.20.0rc0 --pre
+pandas>=1.5.0
+numpy>=1.21.0
+scikit-learn>=1.3.0
+matplotlib>=3.5.0
+seaborn>=0.11.0
+streamlit>=1.28.0
+scikeras>=0.12.0
+plotly>=5.0.0
+jupyter>=1.0.0
